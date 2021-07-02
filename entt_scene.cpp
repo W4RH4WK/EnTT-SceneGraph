@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <optional>
+#include <type_traits>
 #include <vector>
 
 #include <cassert>
@@ -151,32 +152,27 @@ class SceneNode
 
 //////////////////////////////////////////////////////////////////////////
 
-// Using unique_ptr as component enables us to use addresses as node references.
-using SceneNodeComponent = std::unique_ptr<SceneNode>;
-
-// Convenience function for adding a SceneNode to an entity.
-SceneNode *addSceneNode(entt::registry &reg, entt::entity e)
-{
-    return reg.emplace<SceneNodeComponent>(e, new SceneNode).get();
-}
-
-// Convenience function for retrieving the SceneNode of an entity.
-SceneNode *getSceneNode(entt::registry &reg, entt::entity e) { return reg.get<SceneNodeComponent>(e).get(); }
+// Ensure components are not relocated in memory. This allows us to use regular
+// points pointing to them.
+template <>
+struct entt::component_traits<SceneNode> : entt::basic_component_traits {
+    using in_place_delete = std::true_type;
+};
 
 // Links an entity with its corresponding SceneNode. This function is used
 // automatically by the registry using the provide callback mechanism.
-void linkSceneNodeWithEntity(entt::registry &reg, entt::entity e) { reg.get<SceneNodeComponent>(e)->m_entity = e; }
+void linkSceneNodeWithEntity(entt::registry &reg, entt::entity e) { reg.get<SceneNode>(e).m_entity = e; }
 
 void registerSceneNodeCallbacks(entt::registry &reg)
 {
-    reg.on_construct<SceneNodeComponent>().connect<&linkSceneNodeWithEntity>();
-    reg.on_update<SceneNodeComponent>().connect<&linkSceneNodeWithEntity>();
+    reg.on_construct<SceneNode>().connect<&linkSceneNodeWithEntity>();
+    reg.on_update<SceneNode>().connect<&linkSceneNodeWithEntity>();
 }
 
 void unregisterSceneNodeCallbacks(entt::registry &reg)
 {
-    reg.on_construct<SceneNodeComponent>().disconnect<&linkSceneNodeWithEntity>();
-    reg.on_update<SceneNodeComponent>().disconnect<&linkSceneNodeWithEntity>();
+    reg.on_construct<SceneNode>().disconnect<&linkSceneNodeWithEntity>();
+    reg.on_update<SceneNode>().disconnect<&linkSceneNodeWithEntity>();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -186,11 +182,14 @@ int main()
     entt::registry reg;
     registerSceneNodeCallbacks(reg);
 
+    // Note the use of pointers for SceneNodes as the SceneNode interface
+    // prefers pointers over references.
+
     auto ship = reg.create();
-    auto shipNode = addSceneNode(reg, ship);
+    auto *shipNode = &reg.emplace<SceneNode>(ship);
 
     auto captain = reg.create();
-    auto captainNode = addSceneNode(reg, captain);
+    auto *captainNode = &reg.emplace<SceneNode>(captain);
 
     // connect captain with his ship
     {
