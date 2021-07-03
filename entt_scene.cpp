@@ -153,7 +153,7 @@ class SceneNode
 //////////////////////////////////////////////////////////////////////////
 
 // Ensure components are not relocated in memory. This allows us to use regular
-// points pointing to them.
+// pointers pointing to them.
 template <>
 struct entt::component_traits<SceneNode> : entt::basic_component_traits {
     using in_place_delete = std::true_type;
